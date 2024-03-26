@@ -2,5 +2,11 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+remappings = [
+    "@chainlink/contracts/=lib/foundry-chainlink-toolkit/lib/chainlink-brownie-contracts/contracts/",
+    "@openzeppelin/contracts/=lib/foundry-chainlink-toolkit/lib/openzeppelin-contracts/contracts/",
+]
+fs_permissions = [{ access = "read", path = "./broadcast" }]
+ffi = true
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
