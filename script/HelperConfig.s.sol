@@ -5,6 +5,12 @@ import {Script} from "forge-std/Script.sol";
 import {MockV3Aggregator} from "../test/mocks/MockV3Aggregator.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/ERC20Mock.sol";
 
+/**
+ * @title HelperConfig
+ * @author Boris Kolev
+ * @notice This script is used to initialize the configuration of the DEFI protocol.
+ * @notice Currently, it supports two configurations: Sepolia and Anvil.
+ */
 contract HelperConfig is Script {
     struct NetworkConfig {
         address wethUsdPriceFeed;

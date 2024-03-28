@@ -12,38 +12,22 @@ contract DecentralizedStableCoinTest is Test {
     }
 
     function testBurnWithZeroAmountShouldRevert() public {
-        vm.expectRevert(
-            DecentralizedStableCoin
-                .DecentralizedStableCoin__MustBeMoreThanZero
-                .selector
-        );
+        vm.expectRevert(DecentralizedStableCoin.DecentralizedStableCoin__MustBeMoreThanZero.selector);
         decentralizedStableCoin.burn(0);
     }
 
     function testBurnWithAmountBiggerThanBalanceShouldRevert() public {
-        vm.expectRevert(
-            DecentralizedStableCoin
-                .DecentralizedStableCoin__BurnAmountExceedsBalance
-                .selector
-        );
+        vm.expectRevert(DecentralizedStableCoin.DecentralizedStableCoin__BurnAmountExceedsBalance.selector);
         decentralizedStableCoin.burn(10);
     }
 
     function testMintWithZeroAddressShouldRevert() public {
-        vm.expectRevert(
-            DecentralizedStableCoin
-                .DecentralizedStableCoin__MintAddressCantBeZeroAddress
-                .selector
-        );
+        vm.expectRevert(DecentralizedStableCoin.DecentralizedStableCoin__MintAddressCantBeZeroAddress.selector);
         decentralizedStableCoin.mint(address(0), 10);
     }
 
     function testMintWithZeroAmountShouldRevert() public {
-        vm.expectRevert(
-            DecentralizedStableCoin
-                .DecentralizedStableCoin__MustBeMoreThanZero
-                .selector
-        );
+        vm.expectRevert(DecentralizedStableCoin.DecentralizedStableCoin__MustBeMoreThanZero.selector);
         decentralizedStableCoin.mint(address(this), 0);
     }
 
@@ -70,11 +54,7 @@ contract DecentralizedStableCoinTest is Test {
     function testCannotBurnMoreThanBalance() public {
         vm.startPrank(decentralizedStableCoin.owner());
         decentralizedStableCoin.mint(address(this), 10);
-        vm.expectRevert(
-            DecentralizedStableCoin
-                .DecentralizedStableCoin__BurnAmountExceedsBalance
-                .selector
-        );
+        vm.expectRevert(DecentralizedStableCoin.DecentralizedStableCoin__BurnAmountExceedsBalance.selector);
         decentralizedStableCoin.burn(15);
         vm.stopPrank();
     }

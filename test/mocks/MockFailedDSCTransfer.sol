@@ -5,15 +5,7 @@ import {ERC20Burnable, ERC20} from "@openzeppelin/contracts/token/ERC20/extensio
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {console} from "forge-std/console.sol";
 
-/**
- * @title DecentralizedStableCoin
- * @author Boris Kolev (0xb0k0)
- * @notice Governed by DSCEngine. ERC20 compatible representation of a Stable Coin.
- * @notice Collateral: Exogenous, Decentralized, Anchored (pegged), Crypto Collateralized
- * @notice Minting: Algorithmic
- * @notice Relative Stability: Pegged to USD
- */
-contract DecentralizedStableCoin is ERC20Burnable, Ownable {
+contract MockFailedDSCTransfer is ERC20Burnable, Ownable {
     error DecentralizedStableCoin__MustBeMoreThanZero();
     error DecentralizedStableCoin__BurnAmountExceedsBalance();
     error DecentralizedStableCoin__MintAddressCantBeZeroAddress();
@@ -40,5 +32,9 @@ contract DecentralizedStableCoin is ERC20Burnable, Ownable {
         }
         _mint(_to, _amount);
         return true;
+    }
+
+    function transfer(address, /* recipient */ uint256 /* amount */ ) public pure override returns (bool) {
+        return false;
     }
 }

@@ -6,6 +6,11 @@ import {DecentralizedStableCoin} from "../src/DecentralizedStableCoin.sol";
 import {DSCEngine} from "../src/DSCEngine.sol";
 import {HelperConfig} from "./HelperConfig.s.sol";
 
+/**
+ * @title DeployDSCEngine
+ * @author Boris Kolev
+ * @notice This script deploys a DSCEngine contract. This engine acts as a DEFI protocol that allows users to mint and burn DSC tokens.
+ */
 contract DeployDSCEngine is Script {
     DecentralizedStableCoin private dsc;
     DSCEngine private engine;
@@ -17,8 +22,7 @@ contract DeployDSCEngine is Script {
     function run() public returns (DecentralizedStableCoin, DSCEngine, HelperConfig) {
         helperConfig = new HelperConfig();
 
-        (address wethUsdPriceFeed, address wbtcUsdPriceFeed, address weth, address wbtc, uint256 deployerKey) =
-            helperConfig.activeConfig();
+        (address wethUsdPriceFeed, address wbtcUsdPriceFeed, address weth, address wbtc,) = helperConfig.activeConfig();
 
         tokenAddresses = [weth, wbtc];
         priceFeedAddresses = [wethUsdPriceFeed, wbtcUsdPriceFeed];
