@@ -6,6 +6,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {console} from "forge-std/console.sol";
+import {OracleLib} from "./library/OracleLib.sol";
 
 /**
  * @title DSCEngine
@@ -27,6 +28,11 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__MintFailed();
     error DSCEngine__HealthFactorIsOK(uint256 healthFactor);
     error DSCEngine__HealthFactorNotImproved();
+
+    ///////////
+    // Types //
+    ////////////
+    using OracleLib for AggregatorV3Interface;
 
     /////////////////
     /// State Var ///
@@ -141,7 +147,6 @@ contract DSCEngine is ReentrancyGuard {
         if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
             revert DSCEngine__HealthFactorIsOK(startingUserHealthFactor);
         }
-        _burnDsc(_debtAmount, msg.sender, _user);
         uint256 collateralToRedeem = getTokenAmountFromUsd(_collateral, _debtAmount);
         uint256 bonus = (collateralToRedeem * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
         uint256 totalCollateralToRedeem = collateralToRedeem + bonus;
@@ -260,8 +265,8 @@ contract DSCEngine is ReentrancyGuard {
      * @param dscFrom The liquidator address which actually burns the DSC
      */
     function _burnDsc(uint256 _amount, address _onBehalfOf, address dscFrom) private {
-        console.log("USER in burnDsc: ", _onBehalfOf);
         s_userDsc[_onBehalfOf] -= _amount;
+        console.log("DSCFrom allowance", i_dsc.allowance(dscFrom, address(this)));
         bool success = i_dsc.transferFrom(dscFrom, address(this), _amount);
         if (!success) {
             revert DSCEngine__TransferFailed();
@@ -291,6 +296,8 @@ contract DSCEngine is ReentrancyGuard {
      */
     function _healthFactor(address _user) private view returns (uint256) {
         (uint256 totalDscMinted, uint256 totalCollateralInUsd) = _getAccountInformation(_user);
+        console.log("totalDscMinted: %s", totalDscMinted);
+        console.log("totalCollateralInUsd: %s", totalCollateralInUsd);
         if (totalDscMinted == 0) return type(uint256).max; // Otherwise we would divide by zero
 
         return calculateHealthFactor(totalCollateralInUsd, totalDscMinted);
@@ -315,7 +322,7 @@ contract DSCEngine is ReentrancyGuard {
      */
     function _getUsdValue(address _token, uint256 _amount) private view returns (uint256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[_token]);
-        (, int256 price,,,) = priceFeed.latestRoundData();
+        (, int256 price,,,) = priceFeed.stalePriceCheck();
         return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * _amount) / PRECISION;
     }
 
@@ -326,7 +333,7 @@ contract DSCEngine is ReentrancyGuard {
      */
     function _getTokenAmountFromUsd(address _token, uint256 _usdAmountInWei) private view returns (uint256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[_token]);
-        (, int256 price,,,) = priceFeed.latestRoundData();
+        (, int256 price,,,) = priceFeed.stalePriceCheck();
         return (_usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
     }
 
