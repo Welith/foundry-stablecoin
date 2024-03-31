@@ -4,8 +4,8 @@ pragma solidity ^0.8.20;
 import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-import {console} from "forge-std/console.sol";
 import {OracleLib} from "./library/OracleLib.sol";
 
 /**
@@ -147,9 +147,14 @@ contract DSCEngine is ReentrancyGuard {
         if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
             revert DSCEngine__HealthFactorIsOK(startingUserHealthFactor);
         }
+
         uint256 collateralToRedeem = getTokenAmountFromUsd(_collateral, _debtAmount);
         uint256 bonus = (collateralToRedeem * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
         uint256 totalCollateralToRedeem = collateralToRedeem + bonus;
+        uint256 totalUserCollteral = s_userCollateral[_user][_collateral];
+        if (collateralToRedeem < totalUserCollteral && totalCollateralToRedeem > totalUserCollteral) {
+            totalCollateralToRedeem = totalUserCollteral;
+        }
         _redeemCollateral(_collateral, totalCollateralToRedeem, _user, msg.sender);
         _burnDsc(_debtAmount, _user, msg.sender);
 
@@ -266,7 +271,6 @@ contract DSCEngine is ReentrancyGuard {
      */
     function _burnDsc(uint256 _amount, address _onBehalfOf, address dscFrom) private {
         s_userDsc[_onBehalfOf] -= _amount;
-        console.log("DSCFrom allowance", i_dsc.allowance(dscFrom, address(this)));
         bool success = i_dsc.transferFrom(dscFrom, address(this), _amount);
         if (!success) {
             revert DSCEngine__TransferFailed();
@@ -296,8 +300,6 @@ contract DSCEngine is ReentrancyGuard {
      */
     function _healthFactor(address _user) private view returns (uint256) {
         (uint256 totalDscMinted, uint256 totalCollateralInUsd) = _getAccountInformation(_user);
-        console.log("totalDscMinted: %s", totalDscMinted);
-        console.log("totalCollateralInUsd: %s", totalCollateralInUsd);
         if (totalDscMinted == 0) return type(uint256).max; // Otherwise we would divide by zero
 
         return calculateHealthFactor(totalCollateralInUsd, totalDscMinted);
@@ -323,18 +325,31 @@ contract DSCEngine is ReentrancyGuard {
     function _getUsdValue(address _token, uint256 _amount) private view returns (uint256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[_token]);
         (, int256 price,,,) = priceFeed.stalePriceCheck();
-        return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * _amount) / PRECISION;
+        return (
+            (uint256(price) * ADDITIONAL_FEED_PRECISION * _getAdditionalFeedPrecisionPerCollateral(_token)) * _amount
+        ) / PRECISION;
     }
 
     /**
      * @param _token The token address to get the amount of based on the USD amount
-     * @param _usdAmountInWei The amount in USD to get the token amount of
+     * @param _usdAmountInWei The amount in USD to get the token amount of in wei
      * @notice This function is used to get the token amount from the USD value
      */
     function _getTokenAmountFromUsd(address _token, uint256 _usdAmountInWei) private view returns (uint256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[_token]);
         (, int256 price,,,) = priceFeed.stalePriceCheck();
-        return (_usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
+        if (price == 0) {
+            return 0;
+        }
+        return (_usdAmountInWei * PRECISION)
+            / (uint256(price) * ADDITIONAL_FEED_PRECISION * _getAdditionalFeedPrecisionPerCollateral(_token));
+    }
+
+    function _getAdditionalFeedPrecisionPerCollateral(address _token) private view returns (uint256) {
+        if (ERC20(_token).decimals() < 18) {
+            return 10 ** (18 - ERC20(_token).decimals());
+        }
+        return 1;
     }
 
     /**

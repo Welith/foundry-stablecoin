@@ -20,6 +20,8 @@ contract DSCEngineTest is Test {
     HelperConfig private helperConfig;
 
     address wethUsdPriceFeed;
+    address wbtcUsdPriceFeed;
+    address wbtc;
     address weth;
     address private _USER = makeAddr("USER");
     address[] tokenAddresses;
@@ -42,9 +44,10 @@ contract DSCEngineTest is Test {
         deployDSCEngine = new DeployDSCEngine();
         (dsc, engine, helperConfig) = deployDSCEngine.run();
 
-        (wethUsdPriceFeed,, weth,,) = helperConfig.activeConfig();
+        (wethUsdPriceFeed, wbtcUsdPriceFeed, weth, wbtc,) = helperConfig.activeConfig();
 
         ERC20Mock(weth).mint(_USER, INITIAL_USER_WETH_BALANCE);
+        ERC20Mock(wbtc).mint(_USER, INITIAL_USER_WETH_BALANCE);
     }
 
     //////////////////
@@ -60,14 +63,21 @@ contract DSCEngineTest is Test {
     //////////////////
     /// Price Feed ///
     //////////////////
-    function testGetUsdValue() public view {
+    function testGetUsdValueWeth() public view {
         uint256 ethAmount = 15e18;
         uint256 expectedEthUsdValue = 30000e18;
         uint256 actualEthUsdValue = engine.getUsdValue(weth, ethAmount);
         assertEq(actualEthUsdValue, expectedEthUsdValue);
     }
 
-    function testGetTokenAmoutFromUsd() public view {
+    function testGetUsdValueWbtc() public view {
+        uint256 btcAmount = 1e8;
+        uint256 expectedBtcUsdValue = 30000e18;
+        uint256 actualBtcUsdValue = engine.getUsdValue(wbtc, btcAmount);
+        assertEq(actualBtcUsdValue, expectedBtcUsdValue);
+    }
+
+    function testGetWethTokenAmoutFromUsd() public view {
         uint256 usdAmount = 100 ether;
         uint256 expectedEthAmount = 0.05 ether;
         uint256 actualEthAmount = engine.getTokenAmountFromUsd(weth, usdAmount);
@@ -115,7 +125,7 @@ contract DSCEngineTest is Test {
     }
 
     //////////////////
-    /// Mint ///
+    /// Mint /////////
     //////////////////
     function testMintRevertsIfZeroAmount() public {
         vm.startPrank(_USER);
@@ -227,6 +237,41 @@ contract DSCEngineTest is Test {
     ////////////////////
     /// Liquidate ////////
     //////////////////
+
+    function testCrititcalHealthFactor() public {
+        address liquidator = makeAddr("LIQUIDATOR");
+        uint256 liquidatorCollateral = 10 ether;
+        ERC20Mock(weth).mint(liquidator, 10 ether);
+        vm.startPrank(liquidator);
+        ERC20Mock(weth).approve(address(engine), liquidatorCollateral);
+        uint256 liquidatorDebtToCover = 200 ether;
+        engine.depositCollateralAndMintDsc(weth, liquidatorCollateral, MINTED_DSC);
+        dsc.approve(address(engine), liquidatorDebtToCover);
+        vm.stopPrank();
+
+        // We set the price of WETH to $105 and WBTC to $95
+        int256 wethUsdPrice = 105e8;
+        MockV3Aggregator(wethUsdPriceFeed).updateAnswer(wethUsdPrice);
+        int256 wbtcUsdPrice = 95e8;
+        MockV3Aggregator(wbtcUsdPriceFeed).updateAnswer(wbtcUsdPrice);
+
+        uint256 amountWethToDeposit = 1e18;
+        uint256 amountWbtcToDeposit = 1e18;
+        uint256 amountDscToMint = 100e18;
+
+        vm.startPrank(_USER);
+        ERC20Mock(weth).approve(address(engine), amountWethToDeposit);
+        engine.depositCollateral(weth, amountWethToDeposit);
+        ERC20Mock(wbtc).approve(address(engine), amountWbtcToDeposit);
+        engine.depositCollateralAndMintDsc(wbtc, amountWbtcToDeposit, amountDscToMint);
+
+        int256 wtbcCrashPrice = 0;
+        MockV3Aggregator(wbtcUsdPriceFeed).updateAnswer(wtbcCrashPrice);
+
+        vm.startPrank(liquidator);
+        engine.liquidate(weth, _USER, amountDscToMint);
+        vm.stopPrank();
+    }
 
     function testLiquidateMustImproveHealthFactor() public {
         MockBrokenDSC failedDsc = new MockBrokenDSC(wethUsdPriceFeed);
